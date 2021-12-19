@@ -40,14 +40,17 @@
 <category> <pattern> CHEERS * </pattern>
   <template>Sure mate.</template></category>
 
-<!--- CSV/Wikipedia -->
+<category> <pattern> I THINK * </pattern>
+  <template>Interesting opinion. Good to hear your thoughts on this topic.</template></category>
+
+<category> <pattern> I BELIEVE * </pattern>
+  <template>Interesting opinion. You make a bold statement.</template></category>
+
+<!--- CSV -->
 <category><pattern> WHAT IS A * </pattern>
     <template>#1$<star index="1"/></template></category>
 
 <category><pattern> WHAT * </pattern>
-  <template><srai>WHAT IS A <star/></srai></template></category>
-
-<category><pattern> DEFINE * </pattern>
   <template><srai>WHAT IS A <star/></srai></template></category>
 
 <category><pattern> WHO * </pattern>
@@ -62,12 +65,40 @@
 <category><pattern> WHICH * </pattern>
   <template><srai>WHAT IS A <star/></srai></template></category>
 
+<category><pattern> TELL ME ABOUT * </pattern>
+  <template><srai>WHAT IS A <star/></srai></template></category>
+
+<category><pattern> EXPLAIN * </pattern>
+  <template><srai>WHAT IS A <star/></srai></template></category>
+
+<!--- Wikipedia -->
+<category><pattern> DEFINE * </pattern>
+  <template>#2$<star index="1"/></template></category>
+
 <!-- Logic input -->
 <category><pattern> I KNOW THAT * IS *</pattern>
   <template>#31$<star index="1"/> is <star index="2"/></template></category>
 
 <category><pattern> CHECK THAT * IS *</pattern>
   <template>#32$<star index="1"/> is <star index="2"/></template></category>
+
+<!--- Voice command -->
+<category><pattern> LET ME SPEAK </pattern>
+  <template>voice</template></category>
+
+<category><pattern> I WANT TO SPEAK </pattern>
+  <template><srai>LET ME SPEAK</srai></template></category>
+
+<category><pattern> STOP </pattern>
+  <template>#9$</template></category>
+
+<!--- Sentiment analysis -->
+<category><pattern> I AM * </pattern>
+  <template>#3$<star index="1"/></template></category>
+
+<!--- Request more information -->
+<category><pattern> I WANT TO KNOW MORE ABOUT * </pattern>
+  <template>#4$<star index="1"/></template></category>
 
 <!-- Default reaction -->
 <category><pattern> * </pattern>
