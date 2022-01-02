@@ -1,12 +1,14 @@
 import aiml
-import wikipedia
 import pandas as pd
 import numpy as np
 import sys
+import matplotlib.pyplot as plt
+import matplotlib.image as img
 
 import speech_recognition as sr
 import pyttsx3
-from googlesearch import search
+import wikipedia
+import webbrowser
 
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
@@ -14,6 +16,11 @@ from nltk.sem import Expression
 from nltk.inference import ResolutionProver, ResolutionProverCommand
 from simpful import *
 from nltk.sentiment import SentimentIntensityAnalyzer
+from nltk.tokenize import word_tokenize, sent_tokenize
+from nltk.corpus import stopwords
+from nltk.stem import PorterStemmer
+from nltk.stem.wordnet import WordNetLemmatizer
+from nltk import pos_tag
 
 kernel = aiml.Kernel()
 kernel.setTextEncoding(None)
@@ -21,29 +28,19 @@ kernel.bootstrap(learnFiles="chatbot.xml")
 
 read_expr = Expression.fromstring
 kb = []
-data = pd.read_csv('sampleKB.csv', header=None)
+data = pd.read_csv('Files/kb.csv', header=None)
 [kb.append(read_expr(row)) for row in data[0]]
-
-
-"""
-Topic: 
-1) Galaxies & Nebula
-2) Jurassic Period 
-"""
 
 
 def main():
 
-    # respond("Welcome! Pleasure to meet you. \nWhat shall I call you?")
-    # name = input()
-    # respond("Great! My topic of interest are galaxies and nebulae. \nAsk me anything and I will do my best to answer.")
+    # respond("Welcome! Pleasure to meet you. \nMy topic of interest is the Tundra Ecosystem. "
+    #         "\nAsk me a question and I will do my best to answer.")
 
     while True:
         try:
             """Manual input"""
-            name = "Aditya S"  # r
-
-            user_input = input(name + ": ")
+            user_input = input("> ")
             response = kernel.respond(user_input)
 
             """Voice input"""
@@ -74,16 +71,17 @@ def chat(user_input, response):
             respond(params[1])
             sys.exit()
         elif cmd == 99:
-            respond("I did not get that, please try again.")
+            print("I did not get that, please try again. "
+                    "\nMake sure your question is related to my topic of interest.")
         elif cmd == 9:
             return None
         elif cmd == 1:
             try:
                 answer = compute_similarity(user_input)
-                respond(answer)
+                print(answer)
             except:
-                # Input that is copy/pasted will cause errors.
-                respond("Sorry, I do not know that. Please be more specific!")
+                # Input that is copy/pasted will result in exception!
+                print("Sorry, I have not been programmed to know that yet. Please be more specific!")
 
         elif cmd == 2:
             try:
@@ -105,14 +103,50 @@ def chat(user_input, response):
                 respond("It seems you don't feel well... \nHopefully our conversation brightens up your mood.")
 
         elif cmd == 4:
-            respond("Here are a few sources you could look at for more information.")
+            respond("Here is more information you could look at.")
+            url = "https://www.google.com/search?q=" + params[1]
+            webbrowser.open_new_tab(url)
 
-            # Retrieve top 10 URLs.
-            for j in search(params[1], tld="co.uk", num=10, stop=10, pause=2):
-                print(j)
+        elif cmd == 5:
+            df = pd.read_csv("Files/fuzzyData.csv", names=["Animal", "Population", "Size"])
+            found = False
+            index = 0
+            for i in df.index:
+                if df['Animal'][i] == params[1]:
+                    found = True
+                    index = i
+                    break
 
-        elif cmd == 31:  # if input pattern is "I know that * is *"
+            if found is True:
+                tfr = fuzzy_system(df['Population'][index]/pow(10, 6), df['Size'][index])
+                tfr = round(tfr, 2)
+                respond("The fertility rate for an adult " + str(params[1]) + " is " + str(tfr) + " births per year")
+            else:
+                print("No matches found on the database.")
+
+        elif cmd == 6:
+            respond("Here is a map showing the regions of the Tundra ecosystem.")
+            tundra = img.imread("Files/tundraMap.png")
+            plt.imshow(tundra)
+            plt.show()
+
+        elif cmd == 7:
+            print("Interesting opinion. Good to hear your insights on this topic.")
+            tok_word = word_tokenize(params[1])
+            tok_sent = sent_tokenize(params[1])
+            stop_words = set(stopwords.words("english"))
+            ps = PorterStemmer()
+            lem = WordNetLemmatizer()
+
+            filtered_words = [w for w in tok_word if w not in stop_words]
+            stemmed_words = [ps.stem(w) for w in filtered_words]
+            pos = pos_tag(stemmed_words)
+            print(stemmed_words)
+            print(pos)
+
+        elif cmd == 31:  # Add to KB
             object, subject = params[1].split(' is ')
+            object, subject = object.replace(' ', '_'), subject.replace(' ', '_')
             expr = read_expr(subject + '(' + object + ')')
             not_expr = read_expr('-' + str(expr))
 
@@ -124,27 +158,23 @@ def chat(user_input, response):
 
             if condition1 or condition2:
                 kb.append(expr)
-                statement = "OK, I will remember that", object, "is", subject
+                statement = "OK, I will remember that " + object + " is " + subject
                 respond(statement)
             else:
                 respond("Sorry this contradicts with what I know!")
 
-        elif cmd == 32:  # if the input pattern is "check that * is *"
+        elif cmd == 32:  # Check KB
+            print(params[1])
             object, subject = params[1].split(' is ')
+            object, subject = object.replace(' ', '_'), subject.replace(' ', '_')
             expr = read_expr(subject + '(' + object + ')')
-            answer = ResolutionProver().prove(expr, kb, verbose=True)
-            if answer:
-                respond('Correct.')
-            else:
-                not_expr = read_expr('-' + str(expr))
-                true_prover = ResolutionProverCommand(expr, kb).prove()
-                false_prover = ResolutionProverCommand(not_expr, kb).prove()
+            infer_kb(expr)
 
-                # Provide definitive answer given the condition of the expression using resolution.
-                if not true_prover and false_prover:
-                    respond("Incorrect")
-                else:
-                    respond("Sorry I don't know")
+        elif cmd == 33:
+            predator, prey = params[1].split(' consumes ')
+            predator, prey = predator.replace(' ', '_'), prey.replace(' ', '_')
+            expr = read_expr("consumes(" + predator + ',' + prey + ')')
+            infer_kb(expr)
     else:
         respond(response)
 
@@ -162,79 +192,105 @@ def read_csv(path):
 
 def compute_similarity(query):
 
-    questions, answers = read_csv("sampleQA.csv")
-    questions.append(query)
+    questions, answers = read_csv("Files/QA.csv")  # Files/QA.csv
+    if query in questions:
+        return answers[questions.index(query)]
+    else:
+        questions.append(query)
 
-    """tf-idf"""
-    vectorizer = TfidfVectorizer(stop_words="english")
-    question_tfidf = vectorizer.fit_transform(questions)
-    df = pd.DataFrame(question_tfidf.toarray(), index=questions, columns=vectorizer.get_feature_names())
+        """tf-idf"""
+        vectorizer = TfidfVectorizer(stop_words="english")
+        question_tfidf = vectorizer.fit_transform(questions)
+        df = pd.DataFrame(question_tfidf.toarray(), index=questions, columns=vectorizer.get_feature_names())
 
-    """cosine similarity"""
-    similarity = []
-    for q in questions:
-        score = cosine_similarity([df.loc[query].values], [df.loc[q].values])
-        similarity.append(score[0][0])
+        """cosine similarity"""
+        similarity = []
+        for q in questions:
+            score = cosine_similarity([df.loc[query].values], [df.loc[q].values])
+            similarity.append(score[0][0])
 
-    similarity.pop()
-    result = zip(answers, similarity)
+        similarity.pop()
+        result = zip(answers, similarity)
 
-    answer = ""
-    for ans, score in result:
-        if score == np.max(similarity):
-            answer = ans
+        answer = ""
+        # Set threshold for acceptable similarity
+        if np.max(similarity) < 0.2:
+            respond("Here is what I have found.")
+            url = "https://www.google.com/search?q=" + query
+            webbrowser.open_new_tab(url)
+        else:
+            for ans, score in result:
+                if score == np.max(similarity):
+                    answer = ans
 
-    return answer
+        return answer
+
+
+def infer_kb(expr):
+
+    print("Searching...")
+    answer = ResolutionProver().prove(expr, kb, verbose=False)
+    print("answer: " + str(answer))
+    print("Please wait... \n")
+    if answer:
+        respond("Correct.")
+    else:
+        # Provide definitive answer given the condition of the expression using resolution.
+        not_expr = read_expr('-' + str(expr))
+        true_prover = ResolutionProverCommand(expr, kb).prove()
+        false_prover = ResolutionProverCommand(not_expr, kb).prove()
+
+        if not true_prover and false_prover:
+            respond("Incorrect.")
+        else:
+            print("Sorry, I have not been programmed to know that yet.")  # respond
 
 
 def fuzzy_system(var1, var2):
-    """
-    Mamdani FIS (fuzzy inference system) -> more suitable for human inputs than Sugeno FIS (numerical calculation).
 
-    - Life expectancy
-    - Death of a star about to be nebula
-    - Estimate when each star will go supernova
     """
-
+    Mamdani FIS
+    """
     # Create a fuzzy system object
     FS = FuzzySystem()
 
     # Define fuzzy sets and linguistic variables
-    S_1 = FuzzySet(function=Triangular_MF(a=0, b=0, c=5), term="poor")
-    S_2 = FuzzySet(function=Triangular_MF(a=0, b=5, c=10), term="good")
-    S_3 = FuzzySet(function=Triangular_MF(a=5, b=10, c=10), term="excellent")
-    FS.add_linguistic_variable("v1", LinguisticVariable([S_1, S_2, S_3], concept="Service quality",
-                                                        universe_of_discourse=[0, 10]))
+    P_1 = FuzzySet(function=Triangular_MF(a=0, b=0.05, c=0.1), term="endangered")
+    P_2 = FuzzySet(function=Trapezoidal_MF(a=0.05, b=0.1, c=0.5, d=1), term="normal")
+    P_3 = FuzzySet(function=Triangular_MF(a=0.5, b=10, c=10), term="dense")
+    FS.add_linguistic_variable("population", LinguisticVariable([P_1, P_2, P_3], concept="Population (millions)",
+                                                        universe_of_discourse=[0, 5]))
 
-    F_1 = FuzzySet(function=Triangular_MF(a=0, b=0, c=10), term="rancid")
-    F_2 = FuzzySet(function=Triangular_MF(a=0, b=10, c=10), term="delicious")
-    FS.add_linguistic_variable("v2", LinguisticVariable([F_1, F_2], concept="Food quality",
-                                                        universe_of_discourse=[0, 10]))
+    S_1 = FuzzySet(function=Triangular_MF(a=0, b=0, c=50), term="small")
+    S_2 = FuzzySet(function=Triangular_MF(a=50, b=100, c=500), term="medium")
+    S_3 = FuzzySet(function=Triangular_MF(a=100, b=1000, c=1000), term="large")
+    FS.add_linguistic_variable("size", LinguisticVariable([S_1, S_2, S_3], concept="Size (kilograms)",
+                                                        universe_of_discourse=[0, 1000]))
 
     # Define output fuzzy sets and linguistic variable
-    T_1 = FuzzySet(function=Triangular_MF(a=0, b=0, c=10), term="low")
-    T_2 = FuzzySet(function=Triangular_MF(a=0, b=10, c=20), term="average")
-    T_3 = FuzzySet(function=Trapezoidal_MF(a=10, b=20, c=25, d=25), term="high")
-    FS.add_linguistic_variable("result", LinguisticVariable([T_1, T_2, T_3],
-                                                            universe_of_discourse=[0, 25]))
+    F_1 = FuzzySet(function=Triangular_MF(a=0, b=0, c=1), term="low")
+    F_2 = FuzzySet(function=Triangular_MF(a=0.5, b=1.5, c=2.5), term="average")
+    F_3 = FuzzySet(function=Trapezoidal_MF(a=1, b=2, c=5, d=5), term="high")
+    FS.add_linguistic_variable("fertility", LinguisticVariable([F_1, F_2, F_3], concept="Fertility Rate (births per animal per year)",
+                                                            universe_of_discourse=[0, 5]))
 
     # Produce graphs of fuzzy sets
-    FS.produce_figure(outputfile='output.pdf')
+    # FS.produce_figure(outputfile='output.pdf')
 
     # Define fuzzy rules
-    R1 = "IF (v1 IS poor) OR (v2 IS rancid) THEN (result IS low)"
-    R2 = "IF (v1 IS good) THEN (result IS average)"
-    R3 = "IF (v1 IS excellent) OR (v2 IS delicious) THEN (result IS high)"
+    R1 = "IF (population IS endangered) THEN (fertility IS low)"
+    R2 = "IF (size IS medium) OR (population IS normal) THEN (fertility IS average)"
+    R3 = "IF (size IS small) OR (size IS large) AND (population IS dense) THEN (fertility IS high)"
     FS.add_rules([R1, R2, R3])
 
     # Set antecedents values
-    FS.set_variable("v1", var1)
-    FS.set_variable("v2", var2)
+    FS.set_variable("population", var1)
+    FS.set_variable("size", var2)
 
     # Perform Mamdani inference
     output = FS.Mamdani_inference()
 
-    return output['result']
+    return output['fertility']
 
 
 def respond(command):
@@ -283,6 +339,5 @@ if __name__ == "__main__":
 
 """
 Tasks:
-- analyse grammar
-- google search if more info is requested
+- lemmatization dictionary
 """

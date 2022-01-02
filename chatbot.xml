@@ -2,7 +2,7 @@
 
 <!-- Greetings and Politeness -->
 <category> <pattern> HELLO </pattern>
-  <template>Hello! How are you?</template> </category>
+  <template>Hello! How are you feeling today?</template> </category>
 
 <category> <pattern> HELLO * </pattern>
   <template><srai>HELLO</srai></template> </category>
@@ -17,10 +17,37 @@
   <template>I'm functioning within normal parameters, thanks for asking.</template></category>
 
 <category><pattern> I AM FINE </pattern>
-  <template>That's good to know. What would you like to discuss about?</template></category>
+  <template>That's good to know. What would you like to discuss about regarding the Jurassic Period?</template></category>
 
-<category><pattern> BYE </pattern>
-  <template>#0$Bye! Nice talking to you. You take care now.</template></category>
+<category> <pattern> WHAT IS YOUR NAME </pattern>
+  <template>My name is Artificial Linguistic Internet Computer Entity, but you can call me Alice for short. What's yours?</template></category>
+
+<category>
+  <pattern> MY NAME IS *</pattern>
+  <template>
+     Okay! I'll remember that.<think><set name = "user"><star/></set></think>
+  </template>
+</category>
+
+<category> <pattern> THANKS </pattern>
+  <template>You are welcome.</template></category>
+
+<category> <pattern> THANKS * </pattern>
+  <template><srai>THANKS</srai></template></category>
+
+<category> <pattern> THANK YOU </pattern>
+  <template><srai>THANKS</srai></template></category>
+
+<category> <pattern> * THANK YOU </pattern>
+  <template><srai>THANKS</srai></template></category>
+
+<!--- End conversation -->
+<category>
+    <pattern> BYE </pattern>
+  <template>
+      #0$Bye <get name = "user"/>! Nice talking to you. You take care now.
+  </template>
+</category>
 
 <category><pattern> GOODBYE </pattern>
   <template><srai>BYE</srai></template></category>
@@ -28,23 +55,35 @@
 <category><pattern> EXIT </pattern>
   <template><srai>BYE</srai></template></category>
 
-<category> <pattern> THANKS </pattern>
-  <template>You are welcome.</template></category>
+<!--- General conversation about topic -->
+<category> <pattern> WHAT IS YOUR FAVOURITE ARCTIC ANIMAL </pattern>
+  <template>
+      My favourite arctic animal is the snow leopard.
+      <condition name = "animal" value = "">
+          What's yours?
+      </condition>
+  </template>
+</category>
 
-<category> <pattern> THANK YOU </pattern>
-  <template><srai>THANKS</srai></template></category>
+<category>
+  <pattern> MY FAVOURITE ARCTIC ANIMAL IS *</pattern>
+  <template>
+      Interesting choice! I am fascinated of the <set name = "animal"><star/></set> as well.
+      <condition name = "animal" value = "snow leopard">
+          That is my favourite arctic animal too.
+      </condition>
+  </template>
+</category>
 
-<category> <pattern> CHEERS </pattern>
-  <template>Sure mate.</template></category>
+ <category>
+    <pattern> WHAT IS MY FAVOURITE ARCTIC ANIMAL </pattern>
+    <template>
+       Your favourite arctic animal is <get name = "animal"/>.
+    </template>
+ </category>
 
-<category> <pattern> CHEERS * </pattern>
-  <template>Sure mate.</template></category>
-
-<category> <pattern> I THINK * </pattern>
-  <template>Interesting opinion. Good to hear your thoughts on this topic.</template></category>
-
-<category> <pattern> I BELIEVE * </pattern>
-  <template>Interesting opinion. You make a bold statement.</template></category>
+<category><pattern> DO YOU REMEMBER MY FAVOURITE ARCTIC ANIMAL </pattern>
+  <template><srai> WHAT IS MY ARCTIC ANIMAL <star/></srai></template></category>
 
 <!--- CSV -->
 <category><pattern> WHAT IS A * </pattern>
@@ -65,6 +104,9 @@
 <category><pattern> WHICH * </pattern>
   <template><srai>WHAT IS A <star/></srai></template></category>
 
+<category><pattern> WHY * </pattern>
+  <template><srai>WHAT IS A <star/></srai></template></category>
+
 <category><pattern> TELL ME ABOUT * </pattern>
   <template><srai>WHAT IS A <star/></srai></template></category>
 
@@ -82,6 +124,9 @@
 <category><pattern> CHECK THAT * IS *</pattern>
   <template>#32$<star index="1"/> is <star index="2"/></template></category>
 
+<category><pattern> CHECK THAT * CONSUMES * </pattern>
+    <template>#33$<star index="1"/> consumes <star index="2"/></template></category>
+
 <!--- Voice command -->
 <category><pattern> LET ME SPEAK </pattern>
   <template>voice</template></category>
@@ -93,12 +138,30 @@
   <template>#9$</template></category>
 
 <!--- Sentiment analysis -->
-<category><pattern> I AM * </pattern>
+<category><pattern> I AM FEELING * </pattern>
   <template>#3$<star index="1"/></template></category>
+
+<category><pattern> I AM * MOOD </pattern>
+  <template><srai> I AM FEELING <star/></srai></template></category>
 
 <!--- Request more information -->
 <category><pattern> I WANT TO KNOW MORE ABOUT * </pattern>
   <template>#4$<star index="1"/></template></category>
+
+<!--- Fuzzy logic inference -->
+<category><pattern> WHAT IS THE FERTILITY RATE OF * </pattern>
+  <template>#5$<star index="1"/></template></category>
+
+<!--- Display image -->
+<category><pattern> SHOW ME THE REGIONS OF THE TUNDRA </pattern>
+  <template>#6$</template></category>
+
+<!--- Analyze statement -->
+<category><pattern> I THINK * </pattern>
+  <template>#7$<star index="1"/></template></category>
+
+<category><pattern> I BELIEVE * </pattern>
+  <template><srai> I THINK <star/></srai></template></category>
 
 <!-- Default reaction -->
 <category><pattern> * </pattern>
