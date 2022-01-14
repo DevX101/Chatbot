@@ -9,14 +9,18 @@ import speech_recognition as sr
 import pyttsx3
 import wikipedia
 import webbrowser
+import requests
+from googlesearch import search
 
+from textblob import TextBlob
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 from nltk.sem import Expression
-from nltk.inference import ResolutionProver, ResolutionProverCommand
+from nltk.inference import ResolutionProver, ResolutionProverCommand, TableauProver
 from simpful import *
 from nltk.sentiment import SentimentIntensityAnalyzer
-from nltk.tokenize import word_tokenize, sent_tokenize
+from nltk.sem.drt import DrtParser, DrtExpression, DRS
+from nltk.tokenize import word_tokenize, sent_tokenize, RegexpTokenizer
 from nltk.corpus import stopwords
 from nltk.stem import PorterStemmer
 from nltk.stem.wordnet import WordNetLemmatizer
@@ -34,14 +38,30 @@ data = pd.read_csv('Files/kb.csv', header=None)
 
 def main():
 
-    # respond("Welcome! Pleasure to meet you. \nMy topic of interest is the Tundra Ecosystem. "
-    #         "\nAsk me a question and I will do my best to answer.")
+    respond("\nWelcome! Pleasure to meet you. \nMy topic of interest is the Tundra Ecosystem. "
+            "\nAsk me a question and I will do my best to answer.")
 
     while True:
         try:
             """Manual input"""
             user_input = input("> ")
-            response = kernel.respond(user_input)
+
+            # Strip punctuation
+            tokenizer = RegexpTokenizer(r'\w+')
+            input_list = tokenizer.tokenize(user_input)
+            user_input = ' '.join(input_list)
+
+            # Correct spelling
+            correct_input = user_input.lower()
+            spell_check = TextBlob(correct_input)
+            correct_input = spell_check.correct()
+
+            # Fix incorrect spell check
+            ignore_words = [("tunica", "tundra"), ("consumed", "consumes")]
+            for word in ignore_words:
+                correct_input = correct_input.replace(word[0], word[1])
+
+            response = kernel.respond(correct_input)
 
             """Voice input"""
             if response == 'voice':
@@ -71,17 +91,17 @@ def chat(user_input, response):
             respond(params[1])
             sys.exit()
         elif cmd == 99:
-            print("I did not get that, please try again. "
+            respond("I did not get that, please try again. "
                     "\nMake sure your question is related to my topic of interest.")
         elif cmd == 9:
             return None
         elif cmd == 1:
             try:
-                answer = compute_similarity(user_input)
-                print(answer)
+                answer = compute_similarity(str(user_input))
+                respond(answer)
             except:
                 # Input that is copy/pasted will result in exception!
-                print("Sorry, I have not been programmed to know that yet. Please be more specific!")
+                respond("Sorry, I have not been programmed to know that yet. Please be more specific!")
 
         elif cmd == 2:
             try:
@@ -103,9 +123,22 @@ def chat(user_input, response):
                 respond("It seems you don't feel well... \nHopefully our conversation brightens up your mood.")
 
         elif cmd == 4:
-            respond("Here is more information you could look at.")
-            url = "https://www.google.com/search?q=" + params[1]
-            webbrowser.open_new_tab(url)
+
+            query = "what is " + params[1]
+            r = requests.get("https://api.duckduckgo.com",
+                             params={
+                                 "q": query,
+                                 "format": "json"
+                             })
+            data = r.json()
+            answer = data["Abstract"]
+
+            if answer != "":
+                respond(answer)
+            else:
+                respond("Here is more information you could look at.")
+                url = "https://www.google.com/search?q=" + params[1]
+                webbrowser.open_new_tab(url)
 
         elif cmd == 5:
             df = pd.read_csv("Files/fuzzyData.csv", names=["Animal", "Population", "Size"])
@@ -120,7 +153,7 @@ def chat(user_input, response):
             if found is True:
                 tfr = fuzzy_system(df['Population'][index]/pow(10, 6), df['Size'][index])
                 tfr = round(tfr, 2)
-                respond("The fertility rate for an adult " + str(params[1]) + " is " + str(tfr) + " births per year")
+                respond("The fertility rate for an adult " + str(params[1]) + " is " + str(tfr) + " births per year.")
             else:
                 print("No matches found on the database.")
 
@@ -131,6 +164,13 @@ def chat(user_input, response):
             plt.show()
 
         elif cmd == 7:
+            num, query = params[1].split(',')
+            respond("Here are the top " + num + " search results for your query.")
+            n = int(num)
+            for result in search(query, tld="co.uk", num=n, stop=n, pause=1):
+                print(result)
+
+        elif cmd == 8:
             print("Interesting opinion. Good to hear your insights on this topic.")
             tok_word = word_tokenize(params[1])
             tok_sent = sent_tokenize(params[1])
@@ -144,55 +184,20 @@ def chat(user_input, response):
             print(stemmed_words)
             print(pos)
 
-        elif cmd == 31:  # Add to KB
-            object, subject = params[1].split(' is ')
-            object, subject = object.replace(' ', '_'), subject.replace(' ', '_')
-            expr = read_expr(subject + '(' + object + ')')
-            not_expr = read_expr('-' + str(expr))
-
-            # Check if expression is not in contradiction with KB.
-            true_prover = ResolutionProverCommand(expr, kb).prove()
-            false_prover = ResolutionProverCommand(not_expr, kb).prove()
-            condition1 = true_prover and not false_prover
-            condition2 = not true_prover and not false_prover
-
-            if condition1 or condition2:
-                kb.append(expr)
-                statement = "OK, I will remember that " + object + " is " + subject
-                respond(statement)
-            else:
-                respond("Sorry this contradicts with what I know!")
-
-        elif cmd == 32:  # Check KB
-            print(params[1])
-            object, subject = params[1].split(' is ')
-            object, subject = object.replace(' ', '_'), subject.replace(' ', '_')
-            expr = read_expr(subject + '(' + object + ')')
-            infer_kb(expr)
-
-        elif cmd == 33:
-            predator, prey = params[1].split(' consumes ')
-            predator, prey = predator.replace(' ', '_'), prey.replace(' ', '_')
-            expr = read_expr("consumes(" + predator + ',' + prey + ')')
-            infer_kb(expr)
+        elif cmd in (30, 31, 32):
+            logic_chat(user_input)
     else:
         respond(response)
 
 
-def read_csv(path):
+def compute_similarity(query):
 
     # Extract questions & answers from file.
     column_names = ["Questions", "Answers"]
-    df = pd.read_csv(path, names=column_names)
+    df = pd.read_csv("Files/QA.csv", names=column_names)
     questions = df.Questions.tolist()
     answers = df.Answers.tolist()
 
-    return questions, answers
-
-
-def compute_similarity(query):
-
-    questions, answers = read_csv("Files/QA.csv")  # Files/QA.csv
     if query in questions:
         return answers[questions.index(query)]
     else:
@@ -226,12 +231,62 @@ def compute_similarity(query):
         return answer
 
 
+def logic_chat(user_input):
+
+    response = kernel.respond(user_input)
+    params = response[1:].split('$')
+    cmd = int(params[0])
+
+    if cmd == 30:  # Add to KB
+        obj, subject = params[1].split(' is ')
+        obj, subject = obj.replace(' ', '_'), subject.replace(' ', '_')
+        expr = read_expr(subject + '(' + obj + ')')
+        not_expr = read_expr('-' + str(expr))
+
+        # Check if expression is not in contradiction with KB.
+        true_prover = ResolutionProverCommand(expr, kb).prove()
+        false_prover = ResolutionProverCommand(not_expr, kb).prove()
+        condition1 = true_prover and not false_prover
+        condition2 = not true_prover and not false_prover
+
+        if condition1 or condition2:
+            kb.append(expr)
+            statement = "OK, I will remember that " + obj + " is " + subject
+            respond(statement)
+        else:
+            respond("Sorry this contradicts with what I know!")
+
+    elif cmd == 31:  # Check KB
+        obj, subject = params[1].split(' is ')
+        obj, subject = obj.replace(' ', '_'), subject.replace(' ', '_')
+        expr = read_expr(subject + '(' + obj + ')')
+        infer_kb(expr)
+
+    elif cmd == 32:  # Check KB with multi-valued predicates
+        predator, prey = params[1].split(' consumes ')
+        predator, prey = predator.replace(' ', '_'), prey.replace(' ', '_')
+        expr = read_expr("consumes(" + predator + ',' + prey + ')')
+        infer_kb(expr)
+
+    elif cmd == 33:
+        try:
+            dp = DrtParser()
+            dexpr = DrtExpression.fromstring
+            drs1 = dp.parse('([x, y], [carnivore(x), herbivore(y), consumes(x, y)])')
+            drs2 = dp.parse('([u, z], [mammal(u), habitat(z), lives(u, z)])')
+            dr3 = drs1 + drs2
+            dex = dexpr('mammal(' + params[1] + ')')
+            dr3.draw()
+            conclusion = DRS([dex], [dr3]).simplify()
+            proof = TableauProver().prove(dex.fol(), conclusion.fol())
+            print(proof)
+        except:
+            print("Could not compute...")
+
+
 def infer_kb(expr):
 
-    print("Searching...")
     answer = ResolutionProver().prove(expr, kb, verbose=False)
-    print("answer: " + str(answer))
-    print("Please wait... \n")
     if answer:
         respond("Correct.")
     else:
@@ -243,7 +298,7 @@ def infer_kb(expr):
         if not true_prover and false_prover:
             respond("Incorrect.")
         else:
-            print("Sorry, I have not been programmed to know that yet.")  # respond
+            respond("Sorry, I have not been programmed to know that yet.")
 
 
 def fuzzy_system(var1, var2):
@@ -273,9 +328,6 @@ def fuzzy_system(var1, var2):
     F_3 = FuzzySet(function=Trapezoidal_MF(a=1, b=2, c=5, d=5), term="high")
     FS.add_linguistic_variable("fertility", LinguisticVariable([F_1, F_2, F_3], concept="Fertility Rate (births per animal per year)",
                                                             universe_of_discourse=[0, 5]))
-
-    # Produce graphs of fuzzy sets
-    # FS.produce_figure(outputfile='output.pdf')
 
     # Define fuzzy rules
     R1 = "IF (population IS endangered) THEN (fertility IS low)"
@@ -336,8 +388,3 @@ def voice_command():
 
 if __name__ == "__main__":
     main()
-
-"""
-Tasks:
-- lemmatization dictionary
-"""
