@@ -1,9 +1,9 @@
 import aiml
 import pandas as pd
 import numpy as np
+import os
 import sys
 import matplotlib.pyplot as plt
-import matplotlib.image as img
 
 import speech_recognition as sr
 import pyttsx3
@@ -16,15 +16,20 @@ from textblob import TextBlob
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 from nltk.sem import Expression
-from nltk.inference import ResolutionProver, ResolutionProverCommand, TableauProver
+from nltk.inference import ResolutionProver, ResolutionProverCommand
 from simpful import *
 from nltk.sentiment import SentimentIntensityAnalyzer
-from nltk.sem.drt import DrtParser, DrtExpression, DRS
 from nltk.tokenize import word_tokenize, sent_tokenize, RegexpTokenizer
 from nltk.corpus import stopwords
 from nltk.stem import PorterStemmer
 from nltk.stem.wordnet import WordNetLemmatizer
 from nltk import pos_tag
+
+from tensorflow import keras
+import cv2
+from detector import Detector
+from azure_api import azure_image_classification, azure_image_analysis
+import warnings
 
 kernel = aiml.Kernel()
 kernel.setTextEncoding(None)
@@ -35,6 +40,24 @@ kb = []
 data = pd.read_csv('Files/kb.csv', header=None)
 [kb.append(read_expr(row)) for row in data[0]]
 
+# Load image classification model
+warnings.filterwarnings("ignore")
+model = keras.models.load_model("Weights/model.h5")
+labels = ["bear", "deer", "squirrel"]
+correct_labels = dict()
+path_key = ""
+
+# Load object detection model
+model_url = "http://download.tensorflow.org/models/object_detection/tf2/20200711/mask_rcnn_inception_resnet_v2_1024x1024_coco17_gpu-8.tar.gz"
+class_path = "Files/coco.names"
+detect = Detector()
+detect.readClasses(class_path)
+detect.downloadModel(model_url)
+detect.loadModel()
+
+# Azure API
+cog_key = 'YOUR_COG_KEY'
+cog_endpoint = 'YOUR_COG_ENDPOINT'
 
 def main():
 
@@ -159,7 +182,7 @@ def chat(user_input, response):
 
         elif cmd == 6:
             respond("Here is a map showing the regions of the Tundra ecosystem.")
-            tundra = img.imread("Files/tundraMap.png")
+            tundra = plt.imread("Files/tundraMap.png")
             plt.imshow(tundra)
             plt.show()
 
@@ -186,6 +209,72 @@ def chat(user_input, response):
 
         elif cmd in (30, 31, 32):
             logic_chat(user_input)
+
+        elif cmd == 10:
+            try:
+                # Check if label has been corrected
+                if params[1] in correct_labels:
+                    respond("This image is a " + correct_labels[params[1]])
+                else:
+                    # Image Classification
+                    path = os.path.join('Files/Images/', params[1])
+                    result = model.predict_classes([prepare(path, 200)])[0]
+                    respond("This image is a " + labels[result])
+
+                    img = cv2.imread(path)
+                    cv2.imshow("Result", img)
+                    cv2.waitKey(0)
+                    cv2.destroyAllWindows()
+
+                    # Azure Image Classification
+                    prediction = azure_image_classification(params[1])
+                    print("[Azure] This image is a " + prediction)
+            except:
+                respond("I could not find that image.")
+
+        elif cmd == 11:
+            # Video Classification
+            try:
+                path = os.path.join('Files/Images/', params[1])
+                cap = cv2.VideoCapture(path)
+
+                classify_vid = []
+                while cap.isOpened():
+                    (grabbed, frame) = cap.read()
+                    cv2.imshow('Frame', frame)
+                    result = model.predict_classes([prepare(frame, 200)])[0]
+
+                    if result not in classify_vid:
+                        classify_vid.append(result)
+
+                    if cv2.waitKey(0) & 0xFF == ord('q'):
+                        break
+
+                cap.release()
+                cv2.destroyAllWindows()
+
+                # Show the most common label classified from the video
+                # conf = max(set(classify_vid), key=classify_vid.count)
+                # print("This video contains a", labels[int(conf)])
+
+                # Show labels classified from the video
+                if classify_vid is not None:
+                    respond("This video contains...")
+                    num = 0
+                    for index in classify_vid:
+                        print(num, ") ", labels[index])
+
+            except:
+                respond("I could not find that video.")
+
+        elif cmd == 12:
+            # Correct image classification
+            correct_labels[path_key] = params[1]
+            respond("Okay, I will remember that.")
+
+        elif cmd in (13, 14, 15):
+            obj_detect(cmd, params[1])
+
     else:
         respond(response)
 
@@ -268,22 +357,6 @@ def logic_chat(user_input):
         expr = read_expr("consumes(" + predator + ',' + prey + ')')
         infer_kb(expr)
 
-    elif cmd == 33:
-        try:
-            dp = DrtParser()
-            dexpr = DrtExpression.fromstring
-            drs1 = dp.parse('([x, y], [carnivore(x), herbivore(y), consumes(x, y)])')
-            drs2 = dp.parse('([u, z], [mammal(u), habitat(z), lives(u, z)])')
-            dr3 = drs1 + drs2
-            dex = dexpr('mammal(' + params[1] + ')')
-            dr3.draw()
-            conclusion = DRS([dex], [dr3]).simplify()
-            proof = TableauProver().prove(dex.fol(), conclusion.fol())
-            print(proof)
-        except:
-            print("Could not compute...")
-
-
 def infer_kb(expr):
 
     answer = ResolutionProver().prove(expr, kb, verbose=False)
@@ -302,7 +375,6 @@ def infer_kb(expr):
 
 
 def fuzzy_system(var1, var2):
-
     """
     Mamdani FIS
     """
@@ -356,24 +428,14 @@ def respond(command):
 
 
 def voice_command():
-
     r = sr.Recognizer()
-
     response = None
     while response is None:
         try:
             # Microphone as input source.
             with sr.Microphone() as source2:
-
-                # Wait for a second to let the recognizer
-                # adjust the energy threshold based on
-                # the surrounding noise level.
                 r.adjust_for_ambient_noise(source2, duration=0.2)
-
-                # Listen for the user's input.
                 audio2 = r.listen(source2)
-
-                # Recognize audio.
                 response = r.recognize_google(audio2)
                 response = response.lower()
 
@@ -386,5 +448,32 @@ def voice_command():
             respond("Please speak up. I can't hear you.")
 
 
+def prepare(filepath, IMG_SIZE):
+    img_array = cv2.imread(filepath, cv2.IMREAD_GRAYSCALE)
+    new_array = cv2.resize(img_array, (IMG_SIZE, IMG_SIZE))
+    return new_array.reshape(1, IMG_SIZE, IMG_SIZE, -1)
+
+def obj_detect(cmd, path):
+    if cmd == 13:
+        detect.predictImage(path)
+        label_count = detect.getLabels()
+
+        respond("The image contains...")
+        for label in label_count:
+            observation = str(label_count[label]) + ' ' + label
+            respond(observation)
+    elif cmd == 14:
+        detect.predictVideo(path)
+    elif cmd == 15:
+        detect.predictVideo(0)
+
 if __name__ == "__main__":
     main()
+
+"""
+Azure:
+- voice/face recognition 
+- text translation (NLP)
+- OCR (CV)
+- chatbot web service
+"""

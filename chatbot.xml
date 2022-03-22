@@ -173,6 +173,33 @@
 <category><pattern> I BELIEVE * </pattern>
   <template><srai> I THINK <star/></srai></template></category>
 
+<!--- Image Classification -->
+<category><pattern> WHAT IMAGE IS * </pattern>
+  <template>#10$<star index="1"/></template></category>
+
+<!--- Video Classification -->
+<category><pattern> WHAT VIDEO IS * </pattern>
+  <template>#11$<star index="1"/></template></category>
+
+<!--- Correct Image Class -->
+<category><pattern> THAT IMAGE IS * </pattern>
+  <template>#12$<star index="1"/></template></category>
+
+<!--- Image Object Detection -->
+<category><pattern> DESCRIBE THIS IMAGE * </pattern>
+  <template>#13$<star index="1"/></template></category>
+
+<!--- Video Object Detection -->
+<category><pattern> DESCRIBE THIS VIDEO * </pattern>
+  <template>#14$<star index="1"/></template></category>
+
+<!--- Webcam Object Detection -->
+<category><pattern> DESCRIBE MY SURROUNDINGS * </pattern>
+  <template>#15$<star index="1"/></template></category>
+
+<category><pattern> OPEN MY WEBCAM * </pattern>
+  <template><srai> DESCRIBE MY SURROUNDINGS <star/></srai></template></category>
+
 <!-- Default reaction -->
 <category><pattern> * </pattern>
     <template>#99$<star index="1"/></template></category>
