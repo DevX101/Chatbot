@@ -4,6 +4,6 @@
 * AIML for general converstion patterns
 * tf-idf and cosine similarity for question/answering.
 * text-speech & speech-text language understanding.
-- utlizes Microsoft Azure Cognitive services.
-- fine-tuned CNN model to predict the label of image inputed by the user.
+* utlizes Microsoft Azure Cognitive services.
+* fine-tuned CNN model to predict the label of image inputed by the user.
           
