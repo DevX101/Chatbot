@@ -9,7 +9,7 @@ import matplotlib.pyplot as plt
 from sklearn.metrics import classification_report
 import keras_tuner as kt
 
-EPOCHS = 10
+EPOCHS = 100
 BATCH_SIZE = 32
 IMG_SIZE = 200
 CATEGORIES = 3
@@ -80,7 +80,7 @@ model.compile(
 
 learn = model.fit(x_train, y_train, epochs=EPOCHS, batch_size=BATCH_SIZE, validation_data=(x_test, y_test))
 
-# model.save("Weights/Draft/model.h5")
+# model.save("Weights/model.h5")
 # model.summary()
 
 """Evaluation"""
