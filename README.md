@@ -1,3 +1,2 @@
-# AI_Assignment
-Chatbot application</br> 
+# Chatbot application
 *Topic: Tundra Ecosystem*
