@@ -175,11 +175,11 @@
 
 <!--- Image Classification -->
 <category><pattern> WHAT IMAGE IS * </pattern>
-  <template>#10$<star index="1"/></template></category>
+  <template>#10$<star index="1"/>.jpg</template></category>
 
 <!--- Video Classification -->
 <category><pattern> WHAT VIDEO IS * </pattern>
-  <template>#11$<star index="1"/></template></category>
+  <template>#11$<star index="1"/>.avi</template></category>
 
 <!--- Correct Image Class -->
 <category><pattern> THAT IMAGE IS * </pattern>
@@ -187,18 +187,38 @@
 
 <!--- Image Object Detection -->
 <category><pattern> DESCRIBE THIS IMAGE * </pattern>
-  <template>#13$<star index="1"/></template></category>
+  <template>#13$<star index="1"/>.jpg</template></category>
 
 <!--- Video Object Detection -->
 <category><pattern> DESCRIBE THIS VIDEO * </pattern>
-  <template>#14$<star index="1"/></template></category>
+  <template>#14$<star index="1"/>.avi</template></category>
 
 <!--- Webcam Object Detection -->
-<category><pattern> DESCRIBE MY SURROUNDINGS * </pattern>
-  <template>#15$<star index="1"/></template></category>
+<category><pattern> DESCRIBE MY SURROUNDINGS </pattern>
+  <template>#15$</template></category>
 
-<category><pattern> OPEN MY WEBCAM * </pattern>
-  <template><srai> DESCRIBE MY SURROUNDINGS <star/></srai></template></category>
+<category><pattern> OPEN MY WEBCAM </pattern>
+  <template><srai> DESCRIBE MY SURROUNDINGS </srai></template></category>
+
+<!--- OCR -->
+<category><pattern> READ THIS TEXT * </pattern>
+  <template>#16$<star index="1"/>.jpg</template></category>
+
+<!--- Text Translation -->
+<category><pattern> TRANSLATE * </pattern>
+  <template>#17$<star index="1"/></template></category>
+
+<!--- Text Analysis -->
+<category><pattern> ANALYSE * TEXTS ABOUT * </pattern>
+  <template>#18$<star index="1"/>,<star index="2"/></template></category>
+
+<!--- Conversational AI -->
+<category><pattern> ASK AZURE * </pattern>
+  <template>#19$<star index="1"/></template></category>
+
+<!--- Capture Image -->
+<category><pattern> TAKE A PICTURE OF ME </pattern>
+  <template>#20$</template></category>
 
 <!-- Default reaction -->
 <category><pattern> * </pattern>

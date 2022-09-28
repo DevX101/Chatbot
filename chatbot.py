@@ -28,8 +28,10 @@ from nltk import pos_tag
 from tensorflow import keras
 import cv2
 from detector import Detector
-from azure_api import azure_image_classification, azure_image_analysis
 import warnings
+
+from azure_api import azure_image_classification, azure_image_analysis, azure_ocr, azure_face, \
+    azure_translateText, azure_text_analysis, azure_qna
 
 kernel = aiml.Kernel()
 kernel.setTextEncoding(None)
@@ -42,22 +44,19 @@ data = pd.read_csv('Files/kb.csv', header=None)
 
 # Load image classification model
 warnings.filterwarnings("ignore")
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 model = keras.models.load_model("Weights/model.h5")
 labels = ["bear", "deer", "squirrel"]
 correct_labels = dict()
 path_key = ""
 
 # Load object detection model
-model_url = "http://download.tensorflow.org/models/object_detection/tf2/20200711/mask_rcnn_inception_resnet_v2_1024x1024_coco17_gpu-8.tar.gz"
+model_url = "http://download.tensorflow.org/models/object_detection/tf2/20200711/faster_rcnn_resnet152_v1_1024x1024_coco17_tpu-8.tar.gz"
 class_path = "Files/coco.names"
 detect = Detector()
 detect.readClasses(class_path)
 detect.downloadModel(model_url)
 detect.loadModel()
-
-# Azure API
-cog_key = 'YOUR_COG_KEY'
-cog_endpoint = 'YOUR_COG_ENDPOINT'
 
 def main():
 
@@ -74,17 +73,19 @@ def main():
             input_list = tokenizer.tokenize(user_input)
             user_input = ' '.join(input_list)
 
-            # Correct spelling
-            correct_input = user_input.lower()
-            spell_check = TextBlob(correct_input)
-            correct_input = spell_check.correct()
+            # # Correct spelling
+            # correct_input = user_input.lower()
+            # spell_check = TextBlob(correct_input)
+            # correct_input = spell_check.correct()
+            #
+            # # Fix incorrect spell check
+            # ignore_words = [("tunica", "tundra"), ("consumed", "consumes")]
+            # for word in ignore_words:
+            #     correct_input = correct_input.replace(word[0], word[1])
+            #
+            # response = kernel.respond(correct_input)
 
-            # Fix incorrect spell check
-            ignore_words = [("tunica", "tundra"), ("consumed", "consumes")]
-            for word in ignore_words:
-                correct_input = correct_input.replace(word[0], word[1])
-
-            response = kernel.respond(correct_input)
+            response = kernel.respond(user_input)
 
             """Voice input"""
             if response == 'voice':
@@ -106,6 +107,8 @@ def main():
 
 
 def chat(user_input, response):
+
+    global path_key
 
     if response[0] == '#':
         params = response[1:].split('$')
@@ -211,6 +214,7 @@ def chat(user_input, response):
             logic_chat(user_input)
 
         elif cmd == 10:
+            path_key = params[1]
             try:
                 # Check if label has been corrected
                 if params[1] in correct_labels:
@@ -228,38 +232,48 @@ def chat(user_input, response):
 
                     # Azure Image Classification
                     prediction = azure_image_classification(params[1])
-                    print("[Azure] This image is a " + prediction)
+                    print("[Azure] " + prediction)
+
+                    # Azure Image Description/Analysis
+                    analysis = azure_image_analysis(params[1])
+                    respond(analysis)
             except:
                 respond("I could not find that image.")
 
         elif cmd == 11:
             # Video Classification
             try:
-                path = os.path.join('Files/Images/', params[1])
+                path = os.path.join('Files/Videos/', params[1])
                 cap = cv2.VideoCapture(path)
 
                 classify_vid = []
                 while cap.isOpened():
                     (grabbed, frame) = cap.read()
-                    cv2.imshow('Frame', frame)
-                    result = model.predict_classes([prepare(frame, 200)])[0]
+                    if grabbed:
+                        cv2.imshow('Frame', frame)
+                        frame_path = 'Files/Videos/Frames/'
+                        cv2.imwrite(frame_path+'frame.jpg', frame)
+                        result = model.predict_classes([prepare(frame_path+'frame.jpg', 200)])[0]
 
-                    if result not in classify_vid:
-                        classify_vid.append(result)
+                        if result not in classify_vid:
+                            classify_vid.append(result)
 
-                    if cv2.waitKey(0) & 0xFF == ord('q'):
+                        if cv2.waitKey(25) & 0xFF == ord('q'):
+                            break
+                    else:
                         break
 
                 cap.release()
                 cv2.destroyAllWindows()
 
                 # Show the most common label classified from the video
-                # conf = max(set(classify_vid), key=classify_vid.count)
-                # print("This video contains a", labels[int(conf)])
+                conf = max(set(classify_vid), key=classify_vid.count)
+                prediction = "This video is about a " + labels[int(conf)]
+                respond(prediction)
 
                 # Show labels classified from the video
                 if classify_vid is not None:
-                    respond("This video contains...")
+                    print("This video contains...")
                     num = 0
                     for index in classify_vid:
                         print(num, ") ", labels[index])
@@ -275,6 +289,74 @@ def chat(user_input, response):
         elif cmd in (13, 14, 15):
             obj_detect(cmd, params[1])
 
+        elif cmd == 16:
+            try:
+                text = azure_ocr(params[1])
+                print(text)
+
+            except:
+                respond("I could not find that image.")
+
+        elif cmd == 17:
+            try:
+                # Text Translation
+                respond("What language do you want to translate to?")
+                languages = {"french": 'fr', "spanish": 'es', "hindi": 'hi', "arabic": 'ar', "japansese": 'ja'}
+                print("Select from the following:\n")
+                for key in languages.keys():
+                    print(key)
+                lang = input()
+                translate = azure_translateText(params[1], languages[lang])
+
+                reply = "Here is the translation from english to " + lang
+                respond(reply)
+                print(translate)
+
+            except:
+                respond("That language is not available.")
+
+        elif cmd == 18:
+            try:
+                # Text Analysis
+                respond("Reading text...")
+                print('\n')
+                num, title = params[1].split(',')
+                documents = []
+                tundraWiki = wikipedia.search(title, results=num)
+                for wiki in tundraWiki:
+                    docs = {"id": wiki, "text": wikipedia.summary(wiki)}
+                    documents.append(docs)
+
+                azure_text_analysis(documents)
+                respond("Analysis successful!")
+
+            except:
+                respond("I could not retrieve the information requested.")
+
+        elif cmd == 19:
+            try:
+                # Conversational AI
+                answer = azure_qna(params[1])
+                respond(answer)
+            except:
+                respond("I could not retrieve the answer.")
+
+        elif cmd == 20:
+            try:
+                # Capture Image
+                cam = cv2.VideoCapture(0)
+                result, image = cam.read()
+
+                if result:
+                    # cv2.imshow("Face", image)
+                    cv2.imwrite("Files/Images/Faces/face.png", image)
+                    # cv2.waitKey(0)
+                    # cv2.destroyWindow("Face")
+
+                respond("Here is what I have observed after looking at you.")
+                azure_face("face.png")
+            except:
+                respond("I could not capture the image. Make sure your camera is enabled.")
     else:
         respond(response)
 
@@ -454,7 +536,9 @@ def prepare(filepath, IMG_SIZE):
     return new_array.reshape(1, IMG_SIZE, IMG_SIZE, -1)
 
 def obj_detect(cmd, path):
+
     if cmd == 13:
+        path = os.path.join('Files', 'Images', path)
         detect.predictImage(path)
         label_count = detect.getLabels()
 
@@ -463,17 +547,10 @@ def obj_detect(cmd, path):
             observation = str(label_count[label]) + ' ' + label
             respond(observation)
     elif cmd == 14:
+        path = os.path.join('Files', 'Videos', path)
         detect.predictVideo(path)
     elif cmd == 15:
         detect.predictVideo(0)
 
 if __name__ == "__main__":
     main()
-
-"""
-Azure:
-- voice/face recognition 
-- text translation (NLP)
-- OCR (CV)
-- chatbot web service
-"""
